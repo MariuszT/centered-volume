@@ -34,6 +34,11 @@ class AudioMonitor {
     private var storedDefaultOutputDeviceID: AudioDeviceID = 0
     private var cachedMuteState: Bool?
     private var lastOwnWrite: (level: Float, muted: Bool?, at: CFAbsoluteTime)?
+    // The volume to restore on a device with no mute property, set while the
+    // fallback in `toggleVolumeZeroMute` has driven the level to 0. Only
+    // touched from `propertyQueue`, so — unlike the state above — it needs no
+    // lock of its own.
+    private var savedPreMuteVolume: Float?
     private let propertyQueue = DispatchQueue(label: "com.centeredvolume.audio.property")
     private let stateLock = NSLock()
     // How long a value we wrote ourselves stays recognisable as our own echo,
@@ -241,6 +246,10 @@ class AudioMonitor {
         lastOwnWrite = nil
         cachedMuteState = nil
         stateLock.unlock()
+
+        // Also belongs to the device we just left — a level saved for it must
+        // never be replayed onto whatever we switch to.
+        savedPreMuteVolume = nil
 
         if deviceID != 0 {
             addVolumeListener(for: deviceID)
@@ -659,9 +668,21 @@ class AudioMonitor {
     /// Flips the device's mute the way the system mute key does and returns the
     /// state read back from the device. The read-modify-write runs on the
     /// property queue so it cannot interleave with a volume write of our own.
+    ///
+    /// Many HDMI/DisplayPort displays, USB audio interfaces and Bluetooth
+    /// outputs expose `VirtualMainVolume` but no main-element mute at all, so
+    /// this probes for the property before committing to the toggle. Without
+    /// the probe, `setMute` below simply fails on those devices, the read-back
+    /// still reports unmuted, and the key does nothing — worse than the old
+    /// zero-the-volume behaviour it replaced. `toggleVolumeZeroMute` restores
+    /// that old behaviour as the fallback so the key always does something.
     @discardableResult
     func toggleMute(for deviceID: AudioDeviceID) -> Bool {
         propertyQueue.sync {
+            guard hasMuteProperty(for: deviceID) else {
+                return toggleVolumeZeroMute(for: deviceID)
+            }
+
             let target = !isMuted(for: deviceID)
 
             // Recorded before the write, and with the volume the mute leaves
@@ -677,6 +698,70 @@ class AudioMonitor {
             // must not leave the HUD claiming otherwise.
             return isMuted(for: deviceID)
         }
+    }
+
+    private func hasMuteProperty(for deviceID: AudioDeviceID) -> Bool {
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        return AudioObjectHasProperty(deviceID, &propertyAddress)
+    }
+
+    /// Emulates mute on a device with no mute property by saving the current
+    /// level and zeroing it, then restoring that level on the next press —
+    /// this key's behaviour before hardware mute-toggle support replaced it.
+    /// `savedPreMuteVolume` being set is what "muted" means here; there is no
+    /// hardware flag to read back, unlike the branch above. Must run on
+    /// `propertyQueue`, same as the rest of `toggleMute`.
+    private func toggleVolumeZeroMute(for deviceID: AudioDeviceID) -> Bool {
+        dispatchPrecondition(condition: .onQueue(propertyQueue))
+
+        if let savedVolume = savedPreMuteVolume {
+            savedPreMuteVolume = nil
+            setVolumeRaw(for: deviceID, to: savedVolume)
+            return false
+        }
+
+        savedPreMuteVolume = getVolume(for: deviceID)
+        setVolumeRaw(for: deviceID, to: 0)
+        return true
+    }
+
+    /// The raw HAL write `setVolume(to:)` performs, minus its higher-level
+    /// policy (auto-unmute, main-thread dispatch, `notify` branching). Used
+    /// only by `toggleVolumeZeroMute`, which already runs on `propertyQueue`.
+    @discardableResult
+    private func setVolumeRaw(for deviceID: AudioDeviceID, to level: Float) -> Bool {
+        let clampedLevel = max(0, min(1, level))
+        var volume = Float32(clampedLevel)
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        // Recorded before the write, same reasoning as `setVolume(to:)`: the
+        // HAL can deliver the change notification before the setter returns.
+        rememberOwnWrite(level: clampedLevel)
+
+        let status = AudioObjectSetPropertyData(
+            deviceID,
+            &propertyAddress,
+            0,
+            nil,
+            UInt32(MemoryLayout<Float32>.size),
+            &volume
+        )
+
+        if status != noErr {
+            forgetOwnWrite()
+        }
+
+        log(status, "setting volume (mute-property-less fallback)", forDevice: deviceID)
+
+        return status == noErr
     }
 
     @discardableResult
