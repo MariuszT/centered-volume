@@ -13,23 +13,13 @@ above the dock, with the active output device, the level, and the mute state.
 ## What it does
 
 Change the volume with the keyboard, and the HUD appears above the dock and
-fades out about a second later.
+fades out about a second later. Drag it anywhere you like, click the device
+name to switch output, and use the mute key to mute the device itself rather
+than driving the level to zero.
 
-The mute key toggles the device's actual mute state and reads it back, so
-pressing it again brings the level back exactly where you left it. Nothing is
-driven to zero and lost.
-
-![Changing the volume](Screenshots/change.gif)
-
-Drag it anywhere you like. The position is stored as a share of the screen, so
-it lands in the same place when you plug in a different display.
-
-![Dragging the HUD](Screenshots/move.gif)
-
-Click the device name to switch output. Every output device the system knows
-about is in the list, with its own level and mute state.
-
-![Switching the output device](Screenshots/speakers.gif)
+There are recordings of each of those on
+[tarnaski.pl](https://tarnaski.pl/en/centered-volume), along with what they do
+and how to use them.
 
 ## Requirements
 
@@ -51,8 +41,6 @@ Click the gear in the HUD.
 | Keep the HUD visible while hovering | Stops the auto-hide timer while the cursor is over the HUD, so you can drag the slider without it disappearing. |
 | Reset HUD position | Puts the HUD back above the dock, for when you have dragged it somewhere you cannot find. |
 | Accessibility access | Lets the app see volume-key presses even when the volume is already at zero or maximum, where macOS stops sending the event. |
-
-![The settings window](Screenshots/settings.gif)
 
 ## Build from source
 
