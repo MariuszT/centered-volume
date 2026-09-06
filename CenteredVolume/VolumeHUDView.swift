@@ -385,6 +385,17 @@ struct DraggableHeaderView: NSViewRepresentable {
 }
 
 class DraggableNSView: NSView {
+    // The HUD is shown with orderFrontRegardless() only, so the app is never
+    // made active just to display it. Without this override, AppKit's default
+    // (false) spends the very first press activating the (inactive) app
+    // instead of delivering it to mouseDown, and performDrag(with:) never
+    // sees it — so the first drag attempt is silently swallowed. performDrag
+    // itself works fine on an inactive window; only the click routing needed
+    // this.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+
     override func mouseDown(with event: NSEvent) {
         window?.performDrag(with: event)
     }
@@ -571,6 +582,16 @@ class DraggableHandleNSView: NSView {
     // .activeAlways. Activating here would swallow whatever the user is typing
     // in the app they are actually working in, and this app has no dock icon
     // or menu bar item to show them where their keystrokes went.
+    //
+    // That leaves the first click itself: AppKit's default acceptsFirstMouse
+    // is false, so without the override below, the press that would start the
+    // drag is spent activating the (still inactive) app instead of reaching
+    // mouseDown, and the first drag attempt does nothing. VolumeBarNSView
+    // overrides it for the same reason.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+
     override func mouseEntered(with event: NSEvent) {
         isMouseInside = true
         onHoverChange?(true)
