@@ -5,7 +5,7 @@ the dock, in the middle of the screen.
 
 macOS 26 (Tahoe) moved the system volume overlay to the top-right corner. On a
 34-inch ultrawide, or across three displays, that is a long way from wherever
-your eyes happen to be. Centered Volume shows its own HUD instead — centred,
+your eyes happen to be. Centered Volume shows its own HUD instead, centred
 above the dock, with the active output device, the level, and the mute state.
 
 ![The HUD sitting above the dock](Screenshots/dock.gif)
@@ -13,12 +13,10 @@ above the dock, with the active output device, the level, and the mute state.
 ## What it does
 
 Change the volume with the keyboard, and the HUD appears above the dock and
-fades out about a second later. It carries three things the system overlay does
-not put together in one place: which device is playing, where the level sits,
-and whether you are muted.
+fades out about a second later.
 
 The mute key toggles the device's actual mute state and reads it back, so
-pressing it again brings the level back exactly where you left it — nothing is
+pressing it again brings the level back exactly where you left it. Nothing is
 driven to zero and lost.
 
 ![Changing the volume](Screenshots/change.gif)
@@ -41,8 +39,7 @@ macOS 26 (Tahoe) or later. Xcode 26 or newer to build from source.
 
 Download `Centered-Volume.dmg` from
 [the latest release](https://github.com/MariuszT/centered-volume/releases/latest),
-drag the app to `/Applications`, and launch it once. It is signed and notarised,
-so macOS opens it without complaint.
+drag the app to `/Applications`, and launch it once.
 
 ## Settings
 
@@ -56,15 +53,6 @@ Click the gear in the HUD.
 | Accessibility access | Lets the app see volume-key presses even when the volume is already at zero or maximum, where macOS stops sending the event. |
 
 ![The settings window](Screenshots/settings.gif)
-
-## What this is not
-
-It does not replace the system HUD. macOS gives third-party apps no way to
-suppress that overlay, so both appear. This one is the one you can put where you
-want it.
-
-It runs with no dock icon and no menu bar item, on purpose. The only way in is
-the gear on the HUD itself.
 
 ## Build from source
 
